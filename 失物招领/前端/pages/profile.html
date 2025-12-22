@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 - 校园失物招领平台</title>
+    <script src="https://res.gemcoder.com/js/reload.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        success: '#52C41A',
+                        warning: '#FAAD14',
+                        danger: '#FF4D4F',
+                        info: '#8C8C8C',
+                        light: '#F5F5F5',
+                        dark: '#1D2129'
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="min-h-screen bg-gray-50">
+    <!-- 导航栏 -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-primary">校园失物招领平台</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/home" class="text-gray-700 hover:text-primary">首页</a>
+                    <a href="/publish" class="text-gray-700 hover:text-primary">发布</a>
+                    <a href="/profile" class="text-primary font-medium">个人中心</a>
+                    <button id="logout-btn" class="text-gray-700 hover:text-primary">退出登录</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">个人中心</h2>
+
+            <!-- 用户信息 -->
+            <div class="bg-white overflow-hidden shadow rounded-lg mb-6">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">用户信息</h3>
+                    <div id="user-info" class="text-sm text-gray-500">
+                        加载中...
+                    </div>
+                </div>
+            </div>
+
+            <!-- 我的发布 -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">我的发布</h3>
+                    <div id="my-items" class="space-y-4">
+                        加载中...
+                    </div>
+                </div>
+            </div>
+
+            <!-- 认领请求管理 -->
+            <div class="bg-white overflow-hidden shadow rounded-lg mb-6">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">认领请求管理</h3>
+                    <div id="claim-requests" class="space-y-4">
+                        加载中...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        let currentUser = null;
+
+        // 检查登录状态
+        function checkLogin() {
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            if (!token || !user) {
+                window.location.href = '/login';
+                return;
+            }
+            currentUser = JSON.parse(user);
+        }
+
+        // 加载用户信息
+        async function loadUserInfo() {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`${API_BASE}/api/user/profile`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) throw new Error('获取用户信息失败');
+                const user = await response.json();
+
+                const infoDiv = document.getElementById('user-info');
+                infoDiv.innerHTML = `
+                    <p><strong>用户名:</strong> ${user.username}</p>
+                    <p><strong>联系方式:</strong> ${user.contact}</p>
+                    <p><strong>注册时间:</strong> ${user.created_at || '未知'}</p>
+                `;
+            } catch (error) {
+                console.error('加载用户信息失败:', error);
+                document.getElementById('user-info').innerHTML = '加载失败';
+            }
+        }
+
+        // 加载用户发布的物品
+        async function loadMyItems() {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`${API_BASE}/api/item/my`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) throw new Error('获取我的发布失败');
+                const items = await response.json();
+
+                const itemsDiv = document.getElementById('my-items');
+                if (items.length === 0) {
+                    itemsDiv.innerHTML = '<p class="text-gray-500">暂无发布</p>';
+                    return;
+                }
+
+                itemsDiv.innerHTML = items.map(item => `
+                    <div class="border rounded-lg p-4">
+                        <h4 class="font-medium">${item.item_name}</h4>
+                        <p class="text-sm text-gray-600">${item.description}</p>
+                        <p class="text-sm text-gray-500">状态: ${item.status}</p>
+                        <p class="text-sm text-gray-500">发布时间: ${item.publish_time || '未知'}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('加载我的发布失败:', error);
+                document.getElementById('my-items').innerHTML = '加载失败';
+            }
+        }
+
+        // 加载认领请求
+        async function loadClaimRequests() {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`${API_BASE}/api/item/user_claim_requests`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) throw new Error('获取认领请求失败');
+                const requests = await response.json();
+
+                const requestsDiv = document.getElementById('claim-requests');
+                if (requests.length === 0) {
+                    requestsDiv.innerHTML = '<p class="text-gray-500">暂无待处理认领请求</p>';
+                    return;
+                }
+
+                requestsDiv.innerHTML = requests.map(req => `
+                    <div class="border rounded-lg p-4">
+                        <h4 class="font-medium">${req.item_name}</h4>
+                        <p class="text-sm text-gray-600">认领者: ${req.claimant_username}</p>
+                        <p class="text-sm text-gray-500">申请时间: ${req.created_at}</p>
+                        ${req.message ? `<p class="text-sm text-gray-700">认领理由: ${req.message}</p>` : ''}
+                        <div class="mt-2">
+                            <button class="btn-approve bg-green-500 text-white px-3 py-1 rounded mr-2" data-id="${req.claim_id}">同意</button>
+                            <button class="btn-reject bg-red-500 text-white px-3 py-1 rounded" data-id="${req.claim_id}">拒绝</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // 添加事件监听
+                document.querySelectorAll('.btn-approve').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const id = this.getAttribute('data-id');
+                        const response = await fetch(`${API_BASE}/api/item/approve_claim/${id}`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        alert(data.message);
+                        if (response.ok) {
+                            loadClaimRequests();
+                            loadMyItems(); // 刷新物品状态
+                        }
+                    });
+                });
+
+                document.querySelectorAll('.btn-reject').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const id = this.getAttribute('data-id');
+                        const response = await fetch(`${API_BASE}/api/item/reject_claim/${id}`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        alert(data.message);
+                        if (response.ok) {
+                            loadClaimRequests();
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('加载认领请求失败:', error);
+                document.getElementById('claim-requests').innerHTML = '加载失败';
+            }
+        }
+
+        // 退出登录
+        document.getElementById('logout-btn').addEventListener('click', function() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        });
+
+        // 页面加载
+        window.addEventListener('load', function() {
+            checkLogin();
+            loadUserInfo();
+            loadMyItems();
+            loadClaimRequests();
+        });
+    </script>
+</body>
+</html>

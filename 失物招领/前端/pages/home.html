@@ -351,10 +351,13 @@
             for (let i = 1; i <= pages; i++) {
                 const pageBtn = document.createElement('a');
                 pageBtn.href = 'javascript:void(0);';
-                pageBtn.className = 'relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50';
+                
                 if (i === currentPage) {
-                    pageBtn.className += ' bg-primary text-white';
+                    pageBtn.className = 'relative inline-flex items-center px-4 py-2 border border-gray-300 bg-primary text-white text-sm font-medium hover:bg-primary/90';
+                } else {
+                    pageBtn.className = 'relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50';
                 }
+
                 pageBtn.textContent = i;
                 pageBtn.addEventListener('click', () => loadItems(category, time, status, i, search));
                 container.appendChild(pageBtn);

@@ -348,7 +348,7 @@
                 });
 
                 if (response.ok) {
-                    alert('发布成功');
+                    alert('发布成功！请等待管理员审核。');
                     window.location.href = '/home';
                 } else {
                     const data = await response.json();

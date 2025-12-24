@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify
 from app.extensions import db
 from app.models import Comment, User, LostItem
 from app.utils.security import token_required
-from datetime import timedelta
 
 comment_bp = Blueprint('comment', __name__)
 
@@ -35,11 +34,24 @@ def add_comment():
 @comment_bp.route('/list/<int:item_id>', methods=['GET'])
 def get_comments(item_id):
     comments = Comment.query.filter_by(item_id=item_id).order_by(Comment.comment_time).all()
-    return jsonify([{
-        "id": comment.comment_id,
-        "content": comment.content,
-        "created_at": (comment.comment_time + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
-    } for comment in comments]), 200
+    
+    result = []
+    for comment in comments:
+        import random
+        # Use a local Random instance for thread safety
+        rng = random.Random(comment.user_id)
+        suffix = rng.randint(1000, 9999)
+        anonymous_name = f"匿名用户{suffix}"
+        
+        result.append({
+            "comment_id": comment.comment_id,
+            "user_id": comment.user_id,
+            "username": anonymous_name,
+            "content": comment.content,
+            "created_at": comment.comment_time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+        
+    return jsonify(result), 200
 
 @comment_bp.route('/delete/<int:comment_id>', methods=['DELETE'])
 @token_required
@@ -47,8 +59,14 @@ def delete_comment(comment_id):
     comment = Comment.query.get(comment_id)
     if not comment:
         return jsonify({"message": "评论不存在"}), 404
-    if comment.user_id != request.user_id:
+    
+    # 检查是否是管理员
+    current_user = User.query.get(request.user_id)
+    is_admin = current_user.is_admin if current_user else False
+
+    if comment.user_id != request.user_id and not is_admin:
         return jsonify({"message": "无权限删除"}), 403
+        
     db.session.delete(comment)
     db.session.commit()
     return jsonify({"message": "删除成功"}), 200

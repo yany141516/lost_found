@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.extensions import db
-from app.models import User
+from app.models import User, ClaimNotification, ClaimRequest, LostItem
 from functools import wraps
 import jwt
 from datetime import datetime, timedelta
@@ -134,9 +134,26 @@ def get_profile():
     if not user:
         return jsonify({"message": "用户不存在"}), 404
 
+    unread_notif_count = 0
+    pending_audit_count = 0
+    
+    if user.is_admin:
+        unread_notif_count = ClaimNotification.query.filter_by(admin_id=user_id, is_read=False).count()
+        pending_audit_count = LostItem.query.filter_by(status='待审核').count()
+
+    # Pending claims for items published by this user
+    pending_claims_count = ClaimRequest.query.filter(
+        ClaimRequest.item.has(user_id=user_id),
+        ClaimRequest.status == 'pending'
+    ).count()
+
     return jsonify({
         "user_id": user.user_id,
         "username": user.username,
         "contact": user.contact,
-        "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S") if user.created_at else "未知"
+        "is_admin": user.is_admin,
+        "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S") if user.created_at else "未知",
+        "unread_notif_count": unread_notif_count,
+        "pending_audit_count": pending_audit_count,
+        "pending_claims_count": pending_claims_count
     }), 200

@@ -144,7 +144,7 @@
                 <!-- 物品图片 -->
                 <div>
                     <div class='relative bg-gray-100 rounded-lg overflow-hidden cursor-zoom-in' id='main-image-container'>
-                        <img src='${item.image_path || 'https://design.gemcoder.com/staticResource/echoAiSystemImages/d23ef7928af57cbeb34606c356fc4668.png'}' alt='物品图片' class='w-full h-auto' id='main-image' />
+                        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/d23ef7928af57cbeb34606c356fc4668.png' alt='物品图片' class='w-full h-auto' id='main-image' />
                         <div class='absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity'>
                             <i class='fas fa-search-plus text-white text-2xl'></i>
                         </div>
@@ -177,10 +177,12 @@
                         <p class='text-gray-900' id='detail-publisher'>发布者</p>
                     </div>
                     <div class='pt-4 border-t border-gray-100'>
-                        <button id='claim-btn' class='btn-primary w-full'>
-                            <i class='fas fa-hand-holding-heart mr-2'></i>
-                            我要认领
-                        </button>
+                        <div id="claim-section" class="hidden">
+                            <button id='claim-btn' class='btn-primary w-full'>
+                                <i class='fas fa-hand-holding-heart mr-2'></i>
+                                我要认领
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -236,37 +238,93 @@
             document.getElementById('login-to-comment').classList.remove('hidden');
         }
 
-        // 加载物品详情
-        async function loadItemDetail() {
-            try {
-                const response = await fetch(`${API_BASE}/api/item/detail/${itemId}`);
-                const item = await response.json();
-                console.log('API Response:', response.status, item); // 添加调试
-                if (response.ok) {
-                    document.getElementById('detail-item-name').textContent = item.item_name || '未知';
-                    document.getElementById('detail-item-category').textContent = item.category || '未知';
-                    document.getElementById('detail-item-time').textContent = item.event_time || '未知';
-                    document.getElementById('detail-item-location').textContent = item.location || '未知';
-                    document.getElementById('detail-item-description').textContent = item.description || '无描述';
-                    document.getElementById('detail-publish-time').textContent = item.publish_time || '未知';
-                    document.getElementById('detail-publisher').textContent = item.publisher || '匿名用户';
-                    document.getElementById('main-image').src = item.image_path ? `/uploads/${item.image_path}` : 'https://design.gemcoder.com/staticResource/echoAiSystemImages/d23ef7928af57cbeb34606c356fc4668.png';
-                    const statusBadge = document.getElementById('detail-item-status');
-                    statusBadge.textContent = (item.status === '已发布' || item.status === '待审核') ? '未认领' : '已认领';
-                    statusBadge.className = (item.status === '已发布' || item.status === '待审核') ? 'badge bg-yellow-100 text-yellow-800 mt-2 sm:mt-0' : 'badge bg-green-100 text-green-800 mt-2 sm:mt-0';
-                    if (item.status === '已认领' || !token) {
-                        document.getElementById('claim-btn').style.display = 'none';
-                    }
-                    if (item.is_owner) {
-                        document.getElementById('claim-requests-section').style.display = 'block';
-                        loadClaimRequests();
-                    }
+        // 渲染详情
+        function renderDetail(item) {
+            document.getElementById('detail-item-name').textContent = item.item_name;
+            document.getElementById('detail-item-status').textContent = item.status;
+            document.getElementById('detail-item-category').textContent = item.category;
+            document.getElementById('detail-item-time').textContent = item.event_time;
+            document.getElementById('detail-item-location').textContent = item.location;
+            document.getElementById('detail-item-description').textContent = item.description;
+            document.getElementById('detail-publish-time').textContent = item.publish_time || '未知';
+            document.getElementById('detail-publisher').textContent = item.publisher;
+
+            const img = document.getElementById('main-image');
+            if (item.image_path) {
+                img.src = `/uploads/${item.image_path}`;
+            } else {
+                img.src = 'https://design.gemcoder.com/staticResource/echoAiSystemImages/d23ef7928af57cbeb34606c356fc4668.png';
+            }
+
+            // 状态样式
+            const statusBadge = document.getElementById('detail-item-status');
+            if (item.status === '已认领') {
+                statusBadge.className = 'badge bg-green-100 text-green-800 mt-2 sm:mt-0';
+            } else if (item.status === '待审核') {
+                statusBadge.className = 'badge bg-gray-100 text-gray-800 mt-2 sm:mt-0';
+            } else {
+                statusBadge.className = 'badge bg-yellow-100 text-yellow-800 mt-2 sm:mt-0';
+            }
+
+            // 认领按钮逻辑
+            const claimBtn = document.getElementById('claim-btn');
+            if (claimBtn) {
+                if (item.is_owner) {
+                    // Owner doesn't need the claim button, but the section is hidden anyway
+                } else if (item.status !== '已发布') {
+                    claimBtn.disabled = true;
+                    claimBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    claimBtn.textContent = item.status === '已认领' ? '已认领' : '不可认领';
                 } else {
-                    alert('加载物品详情失败: ' + item.message);
+                    // Remove old listeners to prevent duplicates if renderDetail is called multiple times
+                    const newBtn = claimBtn.cloneNode(true);
+                    claimBtn.parentNode.replaceChild(newBtn, claimBtn);
+                    newBtn.addEventListener('click', () => submitClaim(item.item_id));
                 }
+            }
+        }
+
+        // 加载详情
+        async function loadDetail() {
+            const token = localStorage.getItem('token');
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/item/detail/${itemId}`, {
+                    headers: headers
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 403) {
+                        alert('该物品正在审核中或已被驳回，您无权查看。');
+                        window.location.href = '/home';
+                        return;
+                    }
+                    throw new Error('获取详情失败');
+                }
+                
+                const item = await response.json();
+                renderDetail(item);
+                
+                if (item.is_owner) {
+                    loadClaimRequests(); // 加载认领请求
+                } else if (item.status === '已发布' || item.status === '待审核') {
+                    // 只有已发布或待审核（如果是管理员查看）状态才显示认领按钮
+                    // 注意：普通用户看不到待审核，所以这里逻辑是通用的
+                    if (item.status === '已发布') {
+                        document.getElementById('claim-section').classList.remove('hidden');
+                    }
+                }
+
+                // 加载评论
+                loadComments();
+
             } catch (error) {
-                console.error('加载物品详情错误:', error);
-                alert('加载物品详情错误: ' + error.message);
+                console.error('加载详情失败:', error);
+                alert('加载详情失败');
             }
         }
 
@@ -280,6 +338,13 @@
                 });
                 const requests = await response.json();
                 if (response.ok) {
+                    const section = document.getElementById('claim-requests-section');
+                    if (requests.length > 0) {
+                        section.style.display = 'block';
+                    } else {
+                        section.style.display = 'none';
+                    }
+
                     const container = document.getElementById('claim-requests-container');
                     container.innerHTML = requests.map(req => `
                         <div class='p-4 bg-gray-50 rounded-lg mb-4'>
@@ -310,7 +375,7 @@
                             const data = await response.json();
                             alert(data.message);
                             if (response.ok) {
-                                loadItemDetail();
+                                loadDetail();
                                 loadClaimRequests();
                             }
                         });
@@ -335,67 +400,68 @@
             }
         }
 
-        // 加载评论
-        async function loadComments() {
-            try {
-                const response = await fetch(`${API_BASE}/api/comment/list/${itemId}`);
-                const comments = await response.json();
-                if (response.ok) {
-                    const container = document.getElementById('comments-container');
-                    container.innerHTML = comments.map(comment => `
-                        <div class='p-4 bg-gray-50 rounded-lg'>
-                            <div class='flex justify-between items-start'>
-                                <div class='flex items-center'>
-                                    <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/75334867d2a515d1d9f3e441345e310f.png' alt='匿名用户' class='w-8 h-8 rounded-full mr-3' />
-                                    <div>
-                                        <h4 class='font-medium text-gray-900'>匿名用户</h4>
-                                        <p class='text-xs text-gray-500'>${comment.created_at}</p>
-                                    </div>
-                                </div>
-                                ${token ? `<button class='text-gray-400 hover:text-gray-600 delete-comment-btn' data-id='${comment.id}'>
-                                    <i class='fas fa-trash-alt'></i>
-                                </button>` : ''}
-                            </div>
-                            <p class='mt-2 text-gray-700'>${comment.content}</p>
-                        </div>
-                    `).join('');
-                }
-            } catch (error) {
-                console.error('加载评论错误:', error);
-            }
-        }
+        // 提交认领
+        async function submitClaim(itemId) {
+            const message = prompt('请输入认领说明（可选）：');
+            if (message === null) return;
 
-        // 返回列表
-        document.getElementById('back-to-list').addEventListener('click', function() {
-            window.location.href = '/home';
-        });
-
-        // 认领物品
-        document.getElementById('claim-btn').addEventListener('click', async function() {
-            if (!token) {
-                alert('请先登录');
-                return;
-            }
-            const message = prompt('请输入认领理由或联系方式（可选）：');
-            if (message === null) return; // 用户取消
             try {
                 const response = await fetch(`${API_BASE}/api/item/claim/${itemId}`, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({ message })
                 });
                 const data = await response.json();
                 alert(data.message);
                 if (response.ok) {
-                    loadItemDetail();
+                    location.reload();
                 }
             } catch (error) {
-                console.error('认领错误:', error);
+                console.error('认领请求失败:', error);
+                alert('提交失败，请重试');
             }
-        });
+        }
+
+        // 加载评论
+        async function loadComments() {
+            try {
+                const response = await fetch(`${API_BASE}/api/comment/list/${itemId}`);
+                const comments = await response.json();
+                const container = document.getElementById('comments-container');
+                
+                if (comments.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center">暂无留言</p>';
+                    return;
+                }
+
+                // 获取当前用户ID，用于判断是否显示删除按钮
+                let currentUserId = null;
+                if (token) {
+                    const userPayload = JSON.parse(atob(token.split('.')[1]));
+                    currentUserId = userPayload.sub; // 假设token中sub是user_id
+                }
+
+                container.innerHTML = comments.map(c => `
+                    <div class="bg-gray-50 p-3 rounded-lg group relative">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-medium text-gray-900">${c.username}</span>
+                            <span class="text-xs text-gray-500">${c.created_at}</span>
+                        </div>
+                        <p class="text-gray-700">${c.content}</p>
+                        ${(currentUser && (currentUser.is_admin || currentUser.user_id === c.user_id)) ? 
+                            `<button class="delete-comment-btn absolute top-2 right-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" data-id="${c.comment_id}">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>` : ''
+                        }
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('加载评论失败:', error);
+            }
+        }
 
         // 提交评论
         document.getElementById('submit-comment').addEventListener('click', async function() {
@@ -404,6 +470,7 @@
                 alert('请输入留言内容');
                 return;
             }
+
             try {
                 const response = await fetch(`${API_BASE}/api/comment/add`, {
                     method: 'POST',
@@ -416,14 +483,17 @@
                         content: content
                     })
                 });
+                
+                const data = await response.json();
                 if (response.ok) {
                     document.getElementById('comment-input').value = '';
                     loadComments();
                 } else {
-                    alert('提交留言失败');
+                    alert(data.message || '留言失败');
                 }
             } catch (error) {
-                console.error('提交留言错误:', error);
+                console.error('留言失败:', error);
+                alert('留言失败，请重试');
             }
         });
 
@@ -452,9 +522,26 @@
         });
 
         // 页面加载
-        document.addEventListener('DOMContentLoaded', function() {
-            loadItemDetail();
-            loadComments();
+        window.addEventListener('load', function() {
+            // 解析用户信息
+            if (token) {
+                try {
+                    // 这里简单解析token获取用户信息，实际项目中可能需要专门的API
+                    // 或者在登录时存储了用户信息
+                    const storedUser = localStorage.getItem('user');
+                    if (storedUser) {
+                        window.currentUser = JSON.parse(storedUser);
+                    }
+                } catch (e) {
+                    console.error('解析用户信息失败', e);
+                }
+            }
+            loadDetail();
+        });
+        
+        // 返回按钮
+        document.getElementById('back-to-list').addEventListener('click', function() {
+            window.location.href = '/home';
         });
     </script>
 </body>

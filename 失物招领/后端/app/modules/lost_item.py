@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 from app.extensions import db
-from app.models import LostItem, User, ClaimRequest
+from app.models import LostItem, User, ClaimRequest, AuditRecord, ClaimNotification
 from functools import wraps
 import jwt
 from app.config import Config
@@ -132,9 +132,13 @@ def get_items():
         query = query.filter_by(item_type=item_type)
     if status:
         if status == 'unclaimed':
-            query = query.filter(LostItem.status.in_(['待审核', '已发布']))
+            # 普通用户只能看到已发布的物品（即审核通过的）
+            query = query.filter(LostItem.status == '已发布')
         elif status == 'claimed':
-            query = query.filter(LostItem.status.in_(['待审核', '已认领']))
+            query = query.filter(LostItem.status == '已认领')
+    else:
+        # 默认情况下（未指定状态），也只显示已发布和已认领的，不显示待审核
+        query = query.filter(LostItem.status.in_(['已发布', '已认领']))
     if time_range:
         from datetime import datetime, timedelta
         days = int(time_range)
@@ -164,13 +168,39 @@ def get_items():
 
 @item_bp.route('/detail/<int:item_id>', methods=['GET'])
 def get_item_detail(item_id):
+    # 尝试获取当前用户信息（可选鉴权）
+    token = request.headers.get('Authorization')
+    current_user_id = None
+    is_admin = False
+    
+    if token:
+        try:
+            token = token.replace('Bearer ', '')
+            payload = jwt.decode(token, Config.SECRET_KEY, algorithms=['HS256'])
+            current_user_id = payload['user_id']
+            # 检查是否为管理员
+            user = User.query.get(current_user_id)
+            if user:
+                is_admin = user.is_admin
+        except:
+            pass # token无效或过期，视为匿名用户
+
     item = LostItem.query.get(item_id)
     if not item:
         return jsonify({"message": "物品不存在"}), 404
-    try:
-        user_id = request.user_id
-    except AttributeError:
-        user_id = None
+
+    # 权限检查：待审核或已驳回的物品，只有发布者和管理员可见
+    if item.status in ['待审核', '已驳回']:
+        if not current_user_id or (item.user_id != current_user_id and not is_admin):
+             return jsonify({"message": "该物品正在审核中或已被驳回，无法查看"}), 403
+
+    # 生成匿名发布者名称
+    import random
+    # Use a local Random instance for thread safety
+    rng = random.Random(item.user_id)
+    suffix = rng.randint(1000, 9999)
+    anonymous_publisher = f"匿名用户{suffix}"
+
     return jsonify({
         "item_id": item.item_id,
         "item_name": item.item_name,
@@ -182,8 +212,8 @@ def get_item_detail(item_id):
         "image_path": item.image_path,
         "status": item.status,
         "publish_time": item.publish_time.strftime("%Y-%m-%d %H:%M:%S") if item.publish_time else None,
-        "publisher": "匿名用户",
-        "is_owner": user_id == item.user_id if user_id else False
+        "publisher": anonymous_publisher,
+        "is_owner": current_user_id == item.user_id if current_user_id else False
     }), 200
 
 @item_bp.route('/claim/<int:item_id>', methods=['POST'])
@@ -233,6 +263,14 @@ def approve_claim(claim_id):
         return jsonify({"message": "无权限"}), 403
     claim.status = 'approved'
     item.status = '已认领'
+    
+    # 通知审核该物品的管理员
+    # 查找最后一次审核通过该物品的记录
+    audit = AuditRecord.query.filter_by(item_id=item.item_id, result='通过').order_by(AuditRecord.audit_time.desc()).first()
+    if audit:
+        notification = ClaimNotification(claim_id=claim.claim_id, admin_id=audit.admin_id)
+        db.session.add(notification)
+
     db.session.commit()
     return jsonify({"message": "已同意认领"}), 200
 
@@ -246,6 +284,13 @@ def reject_claim(claim_id):
     if item.user_id != request.user_id:
         return jsonify({"message": "无权限"}), 403
     claim.status = 'rejected'
+    
+    # 通知审核该物品的管理员
+    audit = AuditRecord.query.filter_by(item_id=item.item_id, result='通过').order_by(AuditRecord.audit_time.desc()).first()
+    if audit:
+        notification = ClaimNotification(claim_id=claim.claim_id, admin_id=audit.admin_id)
+        db.session.add(notification)
+
     db.session.commit()
     return jsonify({"message": "已拒绝认领"}), 200
 

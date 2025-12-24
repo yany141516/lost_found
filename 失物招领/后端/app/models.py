@@ -122,3 +122,16 @@ class ClaimRequest(db.Model):
 
     item = db.relationship('LostItem', backref='claim_requests')
     claimant = db.relationship('User', backref='claim_requests')
+
+
+class ClaimNotification(db.Model):
+    __tablename__ = 'claim_notification'
+
+    notification_id = db.Column(db.Integer, primary_key=True)
+    claim_id = db.Column(db.Integer, db.ForeignKey('claim_request.claim_id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+
+    claim_request = db.relationship('ClaimRequest', backref='notifications')
+    admin = db.relationship('User', backref='notifications')

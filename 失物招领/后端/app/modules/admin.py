@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app.extensions import db
-from app.models import User, LostItem, AuditRecord
+from app.models import User, LostItem, AuditRecord, ClaimNotification
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -46,6 +46,12 @@ def audit_item():
         }), 400
 
     # 5️⃣ 更新失物状态
+    # 再次检查状态，防止并发处理
+    if item.status != '待审核':
+        return jsonify({
+            "message": "该信息已被其他管理员处理"
+        }), 400
+
     if result == '通过':
         item.status = '已发布'
     else:
@@ -69,3 +75,66 @@ def audit_item():
         "result": result,
         "current_status": item.status
     }), 200
+
+
+@admin_bp.route('/pending_items', methods=['GET'])
+def get_pending_items():
+    # 1️⃣ 获取参数
+    admin_id = request.args.get('admin_id')
+
+    # 2️⃣ 校验管理员身份
+    if not admin_id:
+        return jsonify({"message": "缺少管理员ID"}), 400
+        
+    admin = User.query.get(admin_id)
+    if not admin or not admin.is_admin:
+        return jsonify({"message": "无管理员权限"}), 403
+
+    # 3️⃣ 查询待审核物品
+    # 这里可以添加逻辑，如果需要限制只有一个管理员处理，可以加锁或者分配
+    # 目前需求是所有管理员可见，但只有一个能处理（通过audit接口的原子性保证）
+    items = LostItem.query.filter_by(status='待审核').all()
+
+    return jsonify([{
+        "item_id": item.item_id,
+        "item_name": item.item_name,
+        "category": item.category,
+        "item_type": item.item_type,
+        "location": item.location,
+        "event_time": item.event_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "description": item.description,
+        "image_path": item.image_path,
+        "publish_time": item.publish_time.strftime("%Y-%m-%d %H:%M:%S") if item.publish_time else "未知",
+        "publisher": item.user.username
+    } for item in items]), 200
+
+
+@admin_bp.route('/notifications', methods=['GET'])
+def get_notifications():
+    admin_id = request.args.get('admin_id')
+    if not admin_id:
+        return jsonify({"message": "缺少管理员ID"}), 400
+    
+    admin = User.query.get(admin_id)
+    if not admin or not admin.is_admin:
+        return jsonify({"message": "无管理员权限"}), 403
+
+    notifications = ClaimNotification.query.filter_by(admin_id=admin_id).order_by(ClaimNotification.created_at.desc()).all()
+    
+    return jsonify([{
+        "notification_id": n.notification_id,
+        "item_name": n.claim_request.item.item_name,
+        "claimant": n.claim_request.claimant.username,
+        "status": n.claim_request.status, # approved or rejected
+        "created_at": n.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        "is_read": n.is_read
+    } for n in notifications]), 200
+
+@admin_bp.route('/notifications/read/<int:notification_id>', methods=['POST'])
+def mark_notification_read(notification_id):
+    # 简单鉴权略，实际应检查当前用户是否为该通知的所有者
+    notification = ClaimNotification.query.get(notification_id)
+    if notification:
+        notification.is_read = True
+        db.session.commit()
+    return jsonify({"message": "已标记为已读"}), 200

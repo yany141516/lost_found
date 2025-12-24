@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+    <meta charset='UTF-8'/>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'/>
+    <title>校园失物招领平台</title>
+    <script src='https://res.gemcoder.com/js/reload.js'></script>
+    <script src='https://cdn.tailwindcss.com'></script>
+    <link href='https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css' rel='stylesheet'/>
+    <script src='https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js'></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        success: '#52C41A',
+                        warning: '#FAAD14',
+                        danger: '#FF4D4F',
+                        info: '#8C8C8C',
+                        light: '#F5F5F5',
+                        dark: '#1D2129'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif']
+                    },
+                    boxShadow: {
+                        'card': '0 4px 20px rgba(0, 0, 0, 0.08)',
+                        'card-hover': '0 8px 30px rgba(0, 0, 0, 0.12)'
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            .transition-custom {
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .card-hover-effect {
+                transition: all 0.3s;
+                border-radius: 0.5rem;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            }
+            .card-hover-effect:hover {
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+                transform: translateY(-2px);
+            }
+            .btn-primary {
+                background-color: #165DFF;
+                color: white;
+                font-weight: 500;
+                padding: 0.5rem 1rem;
+                border-radius: 0.5rem;
+                transition: all 0.3s;
+                border: none;
+                cursor: pointer;
+            }
+            .btn-primary:hover {
+                background-color: rgba(22, 93, 255, 0.9);
+            }
+            .btn-primary:focus {
+                outline: none;
+                box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.5);
+            }
+            .btn-outline {
+                border: 1px solid #d1d5db;
+                color: #374151;
+                font-weight: 500;
+                padding: 0.5rem 1rem;
+                border-radius: 0.5rem;
+                transition: all 0.3s;
+                background-color: white;
+                cursor: pointer;
+            }
+            .btn-outline:hover {
+                background-color: #f9fafb;
+            }
+            .btn-outline:focus {
+                outline: none;
+                box-shadow: 0 0 0 2px rgba(209, 213, 219, 0.5);
+            }
+            .input-field {
+                width: 100%;
+                padding: 0.5rem 1rem;
+                border: 1px solid #d1d5db;
+                border-radius: 0.5rem;
+                transition: all 0.3s;
+                outline: none;
+            }
+            .input-field:focus {
+                border-color: #165DFF;
+                box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.5);
+            }
+            .label-text {
+                display: block;
+                font-size: 0.875rem;
+                font-weight: 500;
+                color: #374151;
+                margin-bottom: 0.25rem;
+            }
+            .badge {
+                display: inline-flex;
+                align-items: center;
+                padding: 0.125rem 0.625rem;
+                border-radius: 9999px;
+                font-size: 0.75rem;
+                font-weight: 500;
+            }
+        }
+    </style>
+</head>
+<body class='min-h-screen flex flex-col'>
+    <!-- [MODULE] l2m_顶部导航栏 -->
+    <header class='bg-white shadow-sm sticky top-0 z-50'>
+        <div class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div class='flex justify-between h-16'>
+                <div class='flex items-center'>
+                    <a href='/home' class='flex-shrink-0 flex items-center'>
+                        <i class='fas fa-university text-primary text-2xl mr-2'></i>
+                        <span class='font-bold text-xl text-gray-900'>
+                            校园失物招领
+                        </span>
+                    </a>
+                </div>
+                <div class='hidden md:flex items-center space-x-4'>
+                    <div class='relative'>
+                        <input type='text' id='header-search' placeholder='搜索...' class='pl-10 pr-4 py-2 rounded-full border border-gray-300 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300 outline-none' />
+                        <i class='fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400'></i>
+                    </div>
+                </div>
+                <div class='flex items-center'>
+                    <button id='publish-btn' class='btn-primary mr-4 hidden md:flex items-center'>
+                        <i class='fas fa-plus-circle mr-2'></i>
+                        发布信息
+                    </button>
+                    <div class='relative ml-3'>
+                        <div>
+                            <button id='user-menu-button' class='flex items-center max-w-xs rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary'>
+                                <img class='h-8 w-8 rounded-full object-cover' src='https://design.gemcoder.com/staticResource/echoAiSystemImages/126c143f5cd719f7cb9c99ecc39dd288.png' alt='用户头像' />
+                            </button>
+                        </div>
+                        <div id='user-dropdown' class='hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50'>
+                            <div class='py-1' role='menu' aria-orientation='vertical'>
+                                <a href='/profile' id='go-to-profile' class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100' role='menuitem'>
+                                    个人中心
+                                </a>
+                                <a href='javascript:void(0);' id='logout-btn' class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100' role='menuitem'>
+                                    退出登录
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    <!-- [/MODULE] l2m_顶部导航栏 -- 包含平台logo、搜索框、发布信息按钮和用户菜单 -->
+    <!-- [MODULE] m3n_主体信息区 -->
+    <main class='flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6'>
+        <!-- [MODULE] n4o_搜索筛选区 -->
+        <div class='bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-6'>
+            <div class='flex flex-col md:flex-row md:items-center md:justify-between mb-4'>
+                <h2 class='text-xl font-bold text-gray-900'>
+                    失物招领信息
+                </h2>
+                <button id='mobile-publish-btn' class='btn-primary mt-4 md:hidden flex items-center justify-center'>
+                    <i class='fas fa-plus-circle mr-2'></i>
+                    发布信息
+                </button>
+            </div>
+            <div class='space-y-4 md:space-y-0 md:grid md:grid-cols-12 md:gap-4'>
+                <div class='md:col-span-4'>
+                    <div class='relative'>
+                        <input type='text' id='main-search' placeholder='输入物品名称/特征搜索' class='input-field pl-10' />
+                        <span class='absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500'>
+                            <i class='fas fa-search'></i>
+                        </span>
+                    </div>
+                </div>
+                <div class='md:col-span-2'>
+                    <label for='category-filter' class='label-text'>
+                        类别
+                    </label>
+                    <select id='category-filter' class='input-field'>
+                        <option value>全部类别</option>
+                        <option value='证件'>证件</option>
+                        <option value='电子设备'>电子设备</option>
+                        <option value='衣物'>衣物</option>
+                        <option value='书籍'>书籍</option>
+                        <option value='其他'>其他</option>
+                    </select>
+                </div>
+                <div class='md:col-span-3'>
+                    <label for='time-filter' class='label-text'>
+                        时间区间
+                    </label>
+                    <select id='time-filter' class='input-field'>
+                        <option value>全部时间</option>
+                        <option value='7'>近7天</option>
+                        <option value='30'>近30天</option>
+                        <option value='custom'>自定义</option>
+                    </select>
+                </div>
+                <div class='md:col-span-2'>
+                    <label for='status-filter' class='label-text'>
+                        状态
+                    </label>
+                    <select id='status-filter' class='input-field'>
+                        <option value>全部状态</option>
+                        <option value='unclaimed' selected>未认领</option>
+                        <option value='claimed'>已认领</option>
+                    </select>
+                </div>
+                <div class='md:col-span-1 flex items-end'>
+                    <button id='search-btn' class='btn-primary w-full'>
+                        <i class='fas fa-search'></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- [/MODULE] n4o_搜索筛选区 -- 包含搜索框和筛选控件（类别下拉框、时间区间选择、状态筛选） -->
+        <!-- [MODULE] o5p_信息列表区 -->
+        <div id='items-list-container' class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'>
+            <!-- 动态加载物品卡片 -->
+        </div>
+        <!-- [/MODULE] o5p_信息列表区 -- 3列卡片式布局，每卡片包含物品缩略图、名称、类别标签、地点、发布时间、状态标签和查看详情按钮 -->
+        <!-- 分页控件 -->
+        <div class='mt-8 flex justify-center'>
+            <nav id='pagination-container' class='relative z-0 inline-flex rounded-md shadow-sm -space-x-px' aria-label='Pagination'>
+                <!-- 动态生成分页按钮 -->
+            </nav>
+        </div>
+    </main>
+    <!-- [/MODULE] m3n_主体信息区 -- 包含搜索筛选区和信息列表区 -->
+    <!-- 回到顶部按钮 -->
+    <button id='back-to-top' class='fixed bottom-6 right-6 bg-primary text-white p-3 rounded-full shadow-lg opacity-0 invisible transition-all duration-300 hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/50'>
+        <i class='fas fa-arrow-up'></i>
+    </button>
+    <script>
+        const API_BASE = 'http://localhost:5000'; // 后端API基础URL
+
+        // 检查登录状态
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+        }
+
+        // 加载物品列表
+        let currentPage = 1;
+        async function loadItems(category='', time='', status='', page=1, search='') {
+            currentPage = page;
+            try {
+                const params = new URLSearchParams();
+                if (search) params.append('search', search);
+                if (category) params.append('category', category);
+                if (time) params.append('time_range', time);
+                if (status === 'unclaimed') params.append('status', 'unclaimed');
+                if (status === 'claimed') params.append('status', 'claimed');
+                params.append('page', page);
+                params.append('per_page', 6); // 每页6个物品
+                const url = `${API_BASE}/api/item/list?${params}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                if (response.ok) {
+                    renderItems(data.items);
+                    renderPagination(data.total, data.pages, data.current_page);
+                } else {
+                    alert('加载物品失败');
+                }
+            } catch (error) {
+                console.error('加载物品错误:', error);
+            }
+        }
+
+        // 渲染物品列表
+        function renderItems(items) {
+            const container = document.getElementById('items-list-container');
+            container.innerHTML = '';
+            items.forEach(item => {
+                const statusBadge = item.status === '已发布' || item.status === '待审核' ? '<span class="badge bg-yellow-100 text-yellow-800">未认领</span>' : '<span class="badge bg-green-100 text-green-800">已认领</span>';
+                const categoryBadge = `<span class="badge bg-blue-100 text-blue-800 text-xs mr-2">${item.category}</span>`;
+                const card = `
+                    <div class='bg-white rounded-xl overflow-hidden shadow-card card-hover-effect'>
+                        <div class='p-4'>
+                            <div class='flex items-start'>
+                                <img src='${item.image_path ? `/uploads/${item.image_path}` : 'https://design.gemcoder.com/staticResource/echoAiSystemImages/e1b7cd2e086cbc21cb0170ce95479fea.png'}' alt='${item.item_name}' class='w-20 h-20 object-cover rounded-lg mr-4' />
+                                <div class='flex-grow'>
+                                    <div class='flex justify-between items-start'>
+                                        <h3 class='font-semibold text-gray-900'>${item.item_name}</h3>
+                                        ${statusBadge}
+                                    </div>
+                                    <div class='mt-1'>
+                                        ${categoryBadge}
+                                        <span class='text-sm text-gray-500'>${item.item_type}地点: ${item.location}</span>
+                                    </div>
+                                    <p class='text-sm text-gray-500 mt-1'>${item.item_type}时间: ${item.event_time}</p>
+                                </div>
+                            </div>
+                            <div class='mt-4 pt-4 border-t border-gray-100 flex justify-end'>
+                                <button class='text-primary hover:text-primary/80 font-medium text-sm flex items-center view-details-btn' data-id='${item.item_id}'>
+                                    查看详情
+                                    <i class='fas fa-arrow-right ml-1'></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += card;
+            });
+            // 添加查看详情事件
+            document.querySelectorAll('.view-details-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const id = this.getAttribute('data-id');
+                    window.location.href = `/detail?id=${id}`;
+                });
+            });
+        }
+
+        // 渲染分页
+        function renderPagination(total, pages, currentPage) {
+            const container = document.getElementById('pagination-container');
+            container.innerHTML = '';
+            if (pages <= 1) return;
+
+            const search = document.getElementById('main-search').value;
+            const category = document.getElementById('category-filter').value;
+            const time = document.getElementById('time-filter').value;
+            const status = document.getElementById('status-filter').value;
+
+            // 上一页
+            const prevBtn = document.createElement('a');
+            prevBtn.href = 'javascript:void(0);';
+            prevBtn.className = 'relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50';
+            prevBtn.innerHTML = '<span class="sr-only">上一页</span><i class="fas fa-chevron-left"></i>';
+            if (currentPage > 1) {
+                prevBtn.addEventListener('click', () => loadItems(category, time, status, currentPage - 1, search));
+            } else {
+                prevBtn.classList.add('pointer-events-none', 'opacity-50');
+            }
+            container.appendChild(prevBtn);
+
+            // 页码
+            for (let i = 1; i <= pages; i++) {
+                const pageBtn = document.createElement('a');
+                pageBtn.href = 'javascript:void(0);';
+                
+                if (i === currentPage) {
+                    pageBtn.className = 'relative inline-flex items-center px-4 py-2 border border-gray-300 bg-primary text-white text-sm font-medium hover:bg-primary/90';
+                } else {
+                    pageBtn.className = 'relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50';
+                }
+
+                pageBtn.textContent = i;
+                pageBtn.addEventListener('click', () => loadItems(category, time, status, i, search));
+                container.appendChild(pageBtn);
+            }
+
+            // 下一页
+            const nextBtn = document.createElement('a');
+            nextBtn.href = 'javascript:void(0);';
+            nextBtn.className = 'relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50';
+            nextBtn.innerHTML = '<span class="sr-only">下一页</span><i class="fas fa-chevron-right"></i>';
+            if (currentPage < pages) {
+                nextBtn.addEventListener('click', () => loadItems(category, time, status, currentPage + 1, search));
+            } else {
+                nextBtn.classList.add('pointer-events-none', 'opacity-50');
+            }
+            container.appendChild(nextBtn);
+        }
+
+        // 用户菜单切换
+        document.getElementById('user-menu-button').addEventListener('click', function() {
+            const dropdown = document.getElementById('user-dropdown');
+            dropdown.classList.toggle('hidden');
+        });
+
+        // 发布信息按钮
+        document.getElementById('publish-btn').addEventListener('click', function() {
+            window.location.href = '/publish';
+        });
+
+        document.getElementById('mobile-publish-btn').addEventListener('click', function() {
+            window.location.href = '/publish';
+        });
+
+        // 退出登录
+        document.getElementById('logout-btn').addEventListener('click', function() {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        });
+
+        // 搜索功能
+        document.getElementById('search-btn').addEventListener('click', function() {
+            const search = document.getElementById('main-search').value;
+            const category = document.getElementById('category-filter').value;
+            const time = document.getElementById('time-filter').value;
+            const status = document.getElementById('status-filter').value;
+            // 实现搜索逻辑
+            loadItems(category, time, status, 1, search); // 使用搜索参数加载，重置到第一页
+        });
+
+        // 头部搜索功能
+        document.getElementById('header-search').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const search = this.value;
+                document.getElementById('main-search').value = search; // 同步到主搜索框
+                document.getElementById('category-filter').value = '';
+                document.getElementById('time-filter').value = '';
+                document.getElementById('status-filter').value = 'unclaimed';
+                loadItems('', '', 'unclaimed', 1, search);
+            }
+        });
+
+        // 回到顶部
+        window.addEventListener('scroll', function() {
+            const backToTop = document.getElementById('back-to-top');
+            if (window.pageYOffset > 300) {
+                backToTop.classList.remove('opacity-0', 'invisible');
+            } else {
+                backToTop.classList.add('opacity-0', 'invisible');
+            }
+        });
+
+        document.getElementById('back-to-top').addEventListener('click', function() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // 页面加载时加载物品
+        document.addEventListener('DOMContentLoaded', () => loadItems('', '', 'unclaimed', 1));
+    </script>
+</body>
+</html>

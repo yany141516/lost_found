@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 - 校园失物招领平台</title>
+    <script src="https://res.gemcoder.com/js/reload.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        success: '#52C41A',
+                        warning: '#FAAD14',
+                        danger: '#FF4D4F',
+                        info: '#8C8C8C',
+                        light: '#F5F5F5',
+                        dark: '#1D2129'
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="min-h-screen bg-gray-50">
+    <!-- 导航栏 -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-primary">校园失物招领平台</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/home" class="text-gray-700 hover:text-primary">首页</a>
+                    <a href="/publish" class="text-gray-700 hover:text-primary">发布</a>
+                    <a href="/profile" class="text-primary font-medium">个人中心</a>
+                    <button id="logout-btn" class="text-gray-700 hover:text-primary">退出登录</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 sm:px-0 flex flex-col md:flex-row gap-6">
+            
+            <!-- 侧边栏 -->
+            <aside class="w-full md:w-64 flex-shrink-0">
+                <div class="bg-white shadow rounded-lg overflow-hidden sticky top-6">
+                    <!-- 用户简要信息 -->
+                    <div class="p-6 border-b border-gray-100 flex flex-col items-center">
+                        <div class="h-20 w-20 rounded-full bg-blue-100 text-primary flex items-center justify-center text-3xl mb-4">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900" id="sidebar-username">加载中...</h3>
+                        <p class="text-sm text-gray-500 mt-1" id="sidebar-role">...</p>
+                    </div>
+                    
+                    <!-- 导航菜单 -->
+                    <nav class="p-2 space-y-1">
+                        <button onclick="switchTab('user-info-section', this)" class="nav-item w-full text-left px-4 py-3 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-primary transition-all flex items-center group">
+                            <i class="fas fa-id-card w-5 mr-3 text-gray-400 group-hover:text-primary transition-colors"></i> 
+                            个人资料
+                        </button>
+                        <button onclick="switchTab('my-items-section', this)" class="nav-item w-full text-left px-4 py-3 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-primary transition-all flex items-center group">
+                            <i class="fas fa-box w-5 mr-3 text-gray-400 group-hover:text-primary transition-colors"></i> 
+                            我的发布
+                        </button>
+                        <button onclick="switchTab('claim-requests-section', this)" class="nav-item w-full text-left px-4 py-3 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-primary transition-all flex items-center group">
+                            <i class="fas fa-hand-holding w-5 mr-3 text-gray-400 group-hover:text-primary transition-colors"></i> 
+                            认领请求
+                        </button>
+                        
+                        <!-- 管理员菜单 -->
+                        <div class="pt-2 mt-2 border-t border-gray-100 hidden" id="admin-menu-divider"></div>
+                        <button id="nav-admin-audit" onclick="switchTab('admin-section', this)" class="nav-item w-full text-left px-4 py-3 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-primary transition-all flex items-center group hidden">
+                            <i class="fas fa-gavel w-5 mr-3 text-gray-400 group-hover:text-primary transition-colors"></i> 
+                            审核管理
+                        </button>
+                        <button id="nav-admin-notif" onclick="switchTab('admin-notifications-section', this)" class="nav-item w-full text-left px-4 py-3 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-primary transition-all flex items-center group hidden">
+                            <i class="fas fa-bell w-5 mr-3 text-gray-400 group-hover:text-primary transition-colors"></i> 
+                            系统通知
+                        </button>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- 内容区域 -->
+            <div class="flex-1 min-w-0">
+                <!-- 用户信息 -->
+                <div id="user-info-section" class="content-section bg-white shadow rounded-lg">
+                    <div class="px-6 py-5 border-b border-gray-100">
+                        <h3 class="text-lg font-medium text-gray-900">个人资料</h3>
+                    </div>
+                    <div class="p-6">
+                        <div id="user-info" class="text-sm text-gray-500">
+                            加载中...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 我的发布 -->
+                <div id="my-items-section" class="content-section bg-white shadow rounded-lg hidden">
+                    <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="text-lg font-medium text-gray-900">我的发布</h3>
+                        <a href="/publish" class="text-sm text-primary hover:underline">发布新物品</a>
+                    </div>
+                    <div class="p-6">
+                        <div id="my-items" class="space-y-4">
+                            加载中...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 认领请求管理 -->
+                <div id="claim-requests-section" class="content-section bg-white shadow rounded-lg hidden">
+                    <div class="px-6 py-5 border-b border-gray-100">
+                        <h3 class="text-lg font-medium text-gray-900">认领请求管理</h3>
+                    </div>
+                    <div class="p-6">
+                        <div id="claim-requests" class="space-y-4">
+                            加载中...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 管理员审核 -->
+                <div id="admin-section" class="content-section bg-white shadow rounded-lg hidden">
+                    <div class="px-6 py-5 border-b border-gray-100">
+                        <h3 class="text-lg font-medium text-gray-900">管理员审核 - 待发布物品</h3>
+                    </div>
+                    <div class="p-6">
+                        <div id="pending-items" class="space-y-4">
+                            加载中...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 管理员消息通知 -->
+                <div id="admin-notifications-section" class="content-section bg-white shadow rounded-lg hidden">
+                    <div class="px-6 py-5 border-b border-gray-100">
+                        <h3 class="text-lg font-medium text-gray-900">认领处理通知</h3>
+                    </div>
+                    <div class="p-6">
+                        <div id="admin-notifications" class="space-y-4">
+                            加载中...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        let currentUser = null;
+
+        // 检查登录状态
+        function checkLogin() {
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            if (!token || !user) {
+                window.location.href = '/login';
+                return;
+            }
+            currentUser = JSON.parse(user);
+        }
+
+        // 加载用户信息
+        async function loadUserInfo() {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`${API_BASE}/api/user/profile`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) throw new Error('获取用户信息失败');
+                const user = await response.json();
+
+                const infoDiv = document.getElementById('user-info');
+                infoDiv.innerHTML = `
+                    <p><strong>用户名:</strong> ${user.username}</p>
+                    <p><strong>联系方式:</strong> ${user.contact}</p>
+                    <p><strong>注册时间:</strong> ${user.created_at || '未知'}</p>
+                    <p><strong>角色:</strong> ${user.is_admin ? '<span class="text-red-500 font-bold">管理员</span>' : '普通用户'}</p>
+                `;
+
+                // 更新侧边栏用户信息
+                document.getElementById('sidebar-username').textContent = user.username;
+                document.getElementById('sidebar-role').textContent = user.is_admin ? '管理员' : '普通用户';
+
+                // 如果是管理员，显示审核区域并加载数据
+                if (user.is_admin) {
+                    document.getElementById('nav-admin-audit').classList.remove('hidden');
+                    document.getElementById('nav-admin-notif').classList.remove('hidden');
+                    document.getElementById('admin-menu-divider').classList.remove('hidden');
+                    loadPendingItems(user.user_id);
+                    loadAdminNotifications(user.user_id);
+                }
+
+            } catch (error) {
+                console.error('加载用户信息失败:', error);
+                document.getElementById('user-info').innerHTML = '加载失败';
+            }
+        }
+
+        // 加载用户发布的物品
+        async function loadMyItems() {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`${API_BASE}/api/item/my`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) throw new Error('获取我的发布失败');
+                const items = await response.json();
+
+                const itemsDiv = document.getElementById('my-items');
+                if (items.length === 0) {
+                    itemsDiv.innerHTML = '<p class="text-gray-500">暂无发布</p>';
+                    return;
+                }
+
+                itemsDiv.innerHTML = items.map(item => `
+                    <div class="border rounded-lg p-4">
+                        <h4 class="font-medium">${item.item_name}</h4>
+                        <p class="text-sm text-gray-600">${item.description}</p>
+                        <p class="text-sm text-gray-500">状态: ${item.status}</p>
+                        <p class="text-sm text-gray-500">发布时间: ${item.publish_time || '未知'}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('加载我的发布失败:', error);
+                document.getElementById('my-items').innerHTML = '加载失败';
+            }
+        }
+
+        // 加载认领请求
+        async function loadClaimRequests() {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`${API_BASE}/api/item/user_claim_requests`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) throw new Error('获取认领请求失败');
+                const requests = await response.json();
+
+                const requestsDiv = document.getElementById('claim-requests');
+                if (requests.length === 0) {
+                    requestsDiv.innerHTML = '<p class="text-gray-500">暂无待处理认领请求</p>';
+                    return;
+                }
+
+                requestsDiv.innerHTML = requests.map(req => `
+                    <div class="border rounded-lg p-4">
+                        <h4 class="font-medium">${req.item_name}</h4>
+                        <p class="text-sm text-gray-600">认领者: ${req.claimant_username}</p>
+                        <p class="text-sm text-gray-500">申请时间: ${req.created_at}</p>
+                        ${req.message ? `<p class="text-sm text-gray-700">认领理由: ${req.message}</p>` : ''}
+                        <div class="mt-2">
+                            <button class="btn-approve bg-green-500 text-white px-3 py-1 rounded mr-2" data-id="${req.claim_id}">同意</button>
+                            <button class="btn-reject bg-red-500 text-white px-3 py-1 rounded" data-id="${req.claim_id}">拒绝</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // 添加事件监听
+                document.querySelectorAll('.btn-approve').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const id = this.getAttribute('data-id');
+                        const response = await fetch(`${API_BASE}/api/item/approve_claim/${id}`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        alert(data.message);
+                        if (response.ok) {
+                            loadClaimRequests();
+                            loadMyItems(); // 刷新物品状态
+                        }
+                    });
+                });
+
+                document.querySelectorAll('.btn-reject').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const id = this.getAttribute('data-id');
+                        const response = await fetch(`${API_BASE}/api/item/reject_claim/${id}`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        alert(data.message);
+                        if (response.ok) {
+                            loadClaimRequests();
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('加载认领请求失败:', error);
+                document.getElementById('claim-requests').innerHTML = '加载失败';
+            }
+        }
+
+        // 加载待审核物品 (管理员)
+        async function loadPendingItems(adminId) {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/pending_items?admin_id=${adminId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) throw new Error('获取待审核物品失败');
+                const items = await response.json();
+
+                const pendingDiv = document.getElementById('pending-items');
+                if (items.length === 0) {
+                    pendingDiv.innerHTML = '<p class="text-gray-500">暂无待审核物品</p>';
+                    return;
+                }
+
+                pendingDiv.innerHTML = items.map(item => `
+                    <div class="border rounded-lg p-4 flex justify-between items-start">
+                        <div>
+                            <h4 class="font-medium text-lg">${item.item_name}</h4>
+                            <p class="text-sm text-gray-600 mt-1"><strong>描述:</strong> ${item.description}</p>
+                            <p class="text-sm text-gray-500"><strong>分类:</strong> ${item.category}</p>
+                            <p class="text-sm text-gray-500"><strong>发布时间:</strong> ${item.publish_time}</p>
+                            ${item.image_path ? `<img src="/uploads/${item.image_path}" alt="物品图片" class="mt-2 h-24 object-cover rounded">` : ''}
+                        </div>
+                        <div class="flex flex-col space-y-2">
+                            <button class="btn-audit-approve bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition" data-id="${item.item_id}" data-admin="${adminId}">通过</button>
+                            <button class="btn-audit-reject bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition" data-id="${item.item_id}" data-admin="${adminId}">驳回</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // 绑定审核按钮事件
+                document.querySelectorAll('.btn-audit-approve').forEach(btn => {
+                    btn.addEventListener('click', () => handleAudit(btn.dataset.id, btn.dataset.admin, '通过'));
+                });
+                document.querySelectorAll('.btn-audit-reject').forEach(btn => {
+                    btn.addEventListener('click', () => handleAudit(btn.dataset.id, btn.dataset.admin, '驳回'));
+                });
+
+            } catch (error) {
+                console.error('加载待审核物品失败:', error);
+                document.getElementById('pending-items').innerHTML = '加载失败';
+            }
+        }
+
+        // 处理审核操作
+        async function handleAudit(itemId, adminId, result) {
+            const token = localStorage.getItem('token');
+            const reason = result === '驳回' ? prompt("请输入驳回理由:") : '';
+            
+            if (result === '驳回' && !reason) return; // 取消驳回
+
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/audit`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        admin_id: adminId,
+                        item_id: itemId,
+                        result: result,
+                        reason: reason
+                    })
+                });
+
+                const data = await response.json();
+                alert(data.message);
+                
+                if (response.ok) {
+                    loadPendingItems(adminId); // 刷新列表
+                }
+            } catch (error) {
+                console.error('审核操作失败:', error);
+                alert('操作失败，请重试');
+            }
+        }
+
+        // 加载管理员通知
+        async function loadAdminNotifications(adminId) {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/notifications?admin_id=${adminId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) throw new Error('获取通知失败');
+                const notifications = await response.json();
+
+                const container = document.getElementById('admin-notifications');
+                if (notifications.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500">暂无通知</p>';
+                    return;
+                }
+
+                container.innerHTML = notifications.map(n => `
+                    <div class="border rounded-lg p-4 ${n.is_read ? 'bg-gray-50' : 'bg-blue-50 border-blue-200'}">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="font-medium text-gray-900">物品 "${n.item_name}" 的认领请求已被处理</p>
+                                <p class="text-sm text-gray-600 mt-1">认领人: ${n.claimant}</p>
+                                <p class="text-sm text-gray-600">处理结果: <span class="${n.status === 'approved' ? 'text-green-600' : 'text-red-600'} font-bold">${n.status === 'approved' ? '已同意' : '已拒绝'}</span></p>
+                                <p class="text-xs text-gray-400 mt-2">${n.created_at}</p>
+                            </div>
+                            ${!n.is_read ? `<button class="text-xs text-blue-600 hover:text-blue-800" onclick="markRead(${n.notification_id}, ${adminId})">标记已读</button>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('加载通知失败:', error);
+                document.getElementById('admin-notifications').innerHTML = '加载失败';
+            }
+        }
+
+        // 标记通知已读
+        async function markRead(notificationId, adminId) {
+            const token = localStorage.getItem('token');
+            try {
+                await fetch(`${API_BASE}/api/admin/notifications/read/${notificationId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                loadAdminNotifications(adminId);
+            } catch (error) {
+                console.error('标记已读失败:', error);
+            }
+        }
+
+        // 退出登录
+        document.getElementById('logout-btn').addEventListener('click', function() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        });
+
+        // 页面加载
+        window.addEventListener('load', function() {
+            checkLogin();
+            loadUserInfo();
+            loadMyItems();
+            loadClaimRequests();
+            
+            // 初始化选中第一个标签
+            const firstTabBtn = document.querySelector('.nav-item');
+            if(firstTabBtn) {
+                switchTab('user-info-section', firstTabBtn);
+            }
+        });
+
+        // 切换标签页
+        function switchTab(tabId, btnElement) {
+            // 隐藏所有内容区域
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            // 显示目标内容区域
+            document.getElementById(tabId).classList.remove('hidden');
+
+            // 更新导航按钮样式
+            document.querySelectorAll('.nav-item').forEach(btn => {
+                btn.classList.remove('bg-blue-50', 'text-primary');
+                btn.classList.add('text-gray-700');
+                
+                const icon = btn.querySelector('i');
+                if(icon) {
+                    icon.classList.remove('text-primary');
+                    icon.classList.add('text-gray-400');
+                }
+            });
+
+            // 高亮当前按钮
+            if (btnElement) {
+                btnElement.classList.remove('text-gray-700');
+                btnElement.classList.add('bg-blue-50', 'text-primary');
+                
+                const icon = btnElement.querySelector('i');
+                if(icon) {
+                    icon.classList.remove('text-gray-400');
+                    icon.classList.add('text-primary');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

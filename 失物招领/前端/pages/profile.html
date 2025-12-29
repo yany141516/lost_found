@@ -327,21 +327,40 @@
                     return;
                 }
 
-                pendingDiv.innerHTML = items.map(item => `
-                    <div class="border rounded-lg p-4 flex justify-between items-start">
-                        <div>
-                            <h4 class="font-medium text-lg">${item.item_name}</h4>
-                            <p class="text-sm text-gray-600 mt-1"><strong>描述:</strong> ${item.description}</p>
-                            <p class="text-sm text-gray-500"><strong>分类:</strong> ${item.category}</p>
-                            <p class="text-sm text-gray-500"><strong>发布时间:</strong> ${item.publish_time}</p>
-                            ${item.image_path ? `<img src="/uploads/${item.image_path}" alt="物品图片" class="mt-2 h-24 object-cover rounded">` : ''}
+                // 记录图片数组，供预览使用
+                const imageMap = {};
+                items.forEach(it => imageMap[it.item_id] = it.image_urls || []);
+
+                pendingDiv.innerHTML = items.map(item => {
+                    const thumbs = (item.image_urls && item.image_urls.length)
+                        ? `<div class="mt-3 grid grid-cols-3 gap-2">
+                               ${item.image_urls.map((u, i) => `
+                                   <img src="${u}" alt="物品图片${i+1}"
+                                        class="admin-thumb w-24 h-24 object-cover rounded cursor-pointer hover:opacity-90"
+                                        data-item-id="${item.item_id}" data-index="${i}">
+                               `).join('')}
+                           </div>`
+                        : `<p class="mt-3 text-xs text-gray-400">无图片</p>`;
+
+                    return `
+                        <div class="border rounded-lg p-4 flex justify-between items-start">
+                            <div class="pr-4">
+                                <h4 class="font-medium text-lg">${item.item_name}</h4>
+                                <p class="text-sm text-gray-600 mt-1"><strong>描述:</strong> ${item.description || '-'}</p>
+                                <p class="text-sm text-gray-500"><strong>分类:</strong> ${item.category}　<strong>类型:</strong> ${item.item_type}</p>
+                                <p class="text-sm text-gray-500"><strong>地点:</strong> ${item.location}　<strong>时间:</strong> ${item.event_time}</p>
+                                <div class="mt-2">
+                                    <a class="text-primary hover:underline" href="/detail?id=${item.item_id}" target="_blank">查看详情</a>
+                                </div>
+                                ${thumbs}
+                            </div>
+                            <div class="flex flex-col space-y-2">
+                                <button class="btn-audit-approve bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition" data-id="${item.item_id}" data-admin="${adminId}">通过</button>
+                                <button class="btn-audit-reject bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition" data-id="${item.item_id}" data-admin="${adminId}">驳回</button>
+                            </div>
                         </div>
-                        <div class="flex flex-col space-y-2">
-                            <button class="btn-audit-approve bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition" data-id="${item.item_id}" data-admin="${adminId}">通过</button>
-                            <button class="btn-audit-reject bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition" data-id="${item.item_id}" data-admin="${adminId}">驳回</button>
-                        </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
 
                 // 绑定审核按钮事件
                 document.querySelectorAll('.btn-audit-approve').forEach(btn => {
@@ -349,6 +368,15 @@
                 });
                 document.querySelectorAll('.btn-audit-reject').forEach(btn => {
                     btn.addEventListener('click', () => handleAudit(btn.dataset.id, btn.dataset.admin, '驳回'));
+                });
+
+                // 绑定缩略图点击预览
+                document.querySelectorAll('.admin-thumb').forEach(img => {
+                    img.addEventListener('click', () => {
+                        const itemId = img.dataset.itemId;
+                        const index = parseInt(img.dataset.index || '0', 10);
+                        openImageModal(imageMap[itemId] || [], index);
+                    });
                 });
 
             } catch (error) {
@@ -443,6 +471,54 @@
             } catch (error) {
                 console.error('标记已读失败:', error);
             }
+        }
+
+        // 简易图片预览模态（支持左右切换）
+        function openImageModal(urls, startIndex = 0) {
+            if (!urls || !urls.length) return;
+            let idx = Math.min(Math.max(startIndex, 0), urls.length - 1);
+
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black/80 z-50 flex items-center justify-center';
+
+            overlay.innerHTML = `
+                <div class="relative max-w-5xl w-[90vw] flex items-center justify-center">
+                    <button class="absolute top-2 right-2 text-white/80 hover:text-white text-2xl" aria-label="关闭" id="img-close">✕</button>
+                    ${urls.length > 1 ? `
+                        <button class="absolute left-2 md:left-4 text-white/80 hover:text-white text-3xl px-2 py-1" id="img-prev">‹</button>
+                        <button class="absolute right-10 md:right-12 text-white/80 hover:text-white text-3xl px-2 py-1" id="img-next">›</button>
+                    ` : ''}
+                    <img id="img-viewer" src="${urls[idx]}" class="max-h-[80vh] max-w-[90vw] object-contain rounded shadow-lg select-none" />
+                </div>
+            `;
+
+            const update = () => {
+                const viewer = overlay.querySelector('#img-viewer');
+                viewer.src = urls[idx];
+            };
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) document.body.removeChild(overlay);
+            });
+            overlay.querySelector('#img-close').addEventListener('click', () => document.body.removeChild(overlay));
+            const prevBtn = overlay.querySelector('#img-prev');
+            const nextBtn = overlay.querySelector('#img-next');
+            if (prevBtn) prevBtn.addEventListener('click', (e) => { e.stopPropagation(); idx = (idx - 1 + urls.length) % urls.length; update(); });
+            if (nextBtn) nextBtn.addEventListener('click', (e) => { e.stopPropagation(); idx = (idx + 1) % urls.length; update(); });
+
+            const onKey = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', onKey);
+                    if (overlay.parentNode) document.body.removeChild(overlay);
+                } else if (e.key === 'ArrowLeft' && prevBtn) {
+                    prevBtn.click();
+                } else if (e.key === 'ArrowRight' && nextBtn) {
+                    nextBtn.click();
+                }
+            };
+            document.addEventListener('keydown', onKey);
+
+            document.body.appendChild(overlay);
         }
 
         // 退出登录

@@ -7,6 +7,7 @@ import jwt
 from app.config import Config
 from werkzeug.utils import secure_filename
 import os
+import random
 
 item_bp = Blueprint('item', __name__, url_prefix='/api/item')
 
@@ -59,14 +60,22 @@ def publish_item():
 
     # 4️⃣ 处理图片上传
     image_path = ''
-    image = request.files.get('image')
-    if image:
-        filename = secure_filename(image.filename)
+    # 支持多图：最多3张，逗号分隔保存
+    images = request.files.getlist('image')
+    saved_files = []
+    if images:
         upload_folder = os.path.join(os.getcwd(), 'uploads')
         if not os.path.exists(upload_folder):
             os.makedirs(upload_folder)
-        image.save(os.path.join(upload_folder, filename))
-        image_path = filename
+        for idx, img in enumerate(images[:3]):
+            if img and img.filename:
+                filename = secure_filename(img.filename)
+                # 避免同名覆盖：加时间戳或序号
+                base, ext = os.path.splitext(filename)
+                safe_name = f"{base}_{int(datetime.utcnow().timestamp())}_{idx}{ext}"
+                img.save(os.path.join(upload_folder, safe_name))
+                saved_files.append(safe_name)
+        image_path = ','.join(saved_files)
 
     # 5️⃣ 创建物品对象
     new_item = LostItem(

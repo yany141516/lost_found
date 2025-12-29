@@ -143,12 +143,10 @@
             <div class='grid grid-cols-1 lg:grid-cols-2 gap-8'>
                 <!-- 物品图片 -->
                 <div>
-                    <div class='relative bg-gray-100 rounded-lg overflow-hidden cursor-zoom-in' id='main-image-container'>
-                        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/d23ef7928af57cbeb34606c356fc4668.png' alt='物品图片' class='w-full h-auto' id='main-image' />
-                        <div class='absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity'>
-                            <i class='fas fa-search-plus text-white text-2xl'></i>
-                        </div>
+                    <div class='relative bg-gray-100 rounded-lg overflow-hidden' id='main-image-container'>
+                        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/d23ef7928af57cbeb34606c356fc4668.png' alt='物品图片' class='w-full h-auto cursor-zoom-in' id='main-image' />
                     </div>
+                    <div id="thumbs" class="mt-3 grid grid-cols-3 gap-2"></div>
                 </div>
                 <!-- 物品信息 -->
                 <div class='space-y-4'>
@@ -250,11 +248,45 @@
             document.getElementById('detail-publisher').textContent = item.publisher;
 
             const img = document.getElementById('main-image');
-            if (item.image_path) {
-                img.src = `/uploads/${item.image_path}`;
+            const thumbs = document.getElementById('thumbs');
+            const images = (item.image_path ? item.image_path.split(',') : []);
+            if (images.length > 0) {
+                img.src = `/uploads/${images[0]}`;
+                thumbs.innerHTML = images.map((f, idx) => `
+                    <img src="/uploads/${f}" data-idx="${idx}" class="w-full h-20 object-cover rounded cursor-pointer border ${idx===0?'border-primary':'border-transparent'}" />
+                `).join('');
+                thumbs.querySelectorAll('img').forEach(t => {
+                    t.addEventListener('click', () => {
+                        thumbs.querySelectorAll('img').forEach(x => x.classList.remove('border-primary'));
+                        t.classList.add('border-primary');
+                        img.src = t.src;
+                    });
+                });
             } else {
                 img.src = 'https://design.gemcoder.com/staticResource/echoAiSystemImages/d23ef7928af57cbeb34606c356fc4668.png';
+                thumbs.innerHTML = '';
             }
+
+            // 点击放大（简易模态）
+            const createModal = (src) => {
+                const overlay = document.createElement('div');
+                overlay.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
+                overlay.innerHTML = `
+                    <div class="max-w-3xl w-full px-4">
+                        <img src="${src}" class="w-full h-auto rounded shadow-lg" />
+                        <button class="mt-3 btn-outline w-full">关闭</button>
+                    </div>
+                `;
+                overlay.addEventListener('click', (e) => {
+                    if (e.target.tagName === 'BUTTON' || e.target === overlay) {
+                        document.body.removeChild(overlay);
+                    }
+                });
+                document.body.appendChild(overlay);
+            };
+            document.getElementById('main-image-container').addEventListener('click', () => {
+                createModal(document.getElementById('main-image').src);
+            });
 
             // 状态样式
             const statusBadge = document.getElementById('detail-item-status');
@@ -546,3 +578,4 @@
     </script>
 </body>
 </html>
+``` 

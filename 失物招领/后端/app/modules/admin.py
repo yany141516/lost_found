@@ -85,28 +85,36 @@ def get_pending_items():
     # 2️⃣ 校验管理员身份
     if not admin_id:
         return jsonify({"message": "缺少管理员ID"}), 400
-        
     admin = User.query.get(admin_id)
     if not admin or not admin.is_admin:
         return jsonify({"message": "无管理员权限"}), 403
 
     # 3️⃣ 查询待审核物品
-    # 这里可以添加逻辑，如果需要限制只有一个管理员处理，可以加锁或者分配
-    # 目前需求是所有管理员可见，但只有一个能处理（通过audit接口的原子性保证）
-    items = LostItem.query.filter_by(status='待审核').all()
+    items = LostItem.query.filter_by(status='待审核').order_by(LostItem.publish_time.desc()).all()
 
-    return jsonify([{
-        "item_id": item.item_id,
-        "item_name": item.item_name,
-        "category": item.category,
-        "item_type": item.item_type,
-        "location": item.location,
-        "event_time": item.event_time.strftime("%Y-%m-%d %H:%M:%S"),
-        "description": item.description,
-        "image_path": item.image_path,
-        "publish_time": item.publish_time.strftime("%Y-%m-%d %H:%M:%S") if item.publish_time else "未知",
-        "publisher": item.user.username
-    } for item in items]), 200
+    def build_image_list(image_path):
+        if not image_path:
+            return []
+        return [p for p in image_path.split(',') if p]
+
+    result = []
+    for item in items:
+        images = build_image_list(item.image_path)
+        result.append({
+            "item_id": item.item_id,
+            "item_name": item.item_name,
+            "category": item.category,
+            "item_type": item.item_type,
+            "location": item.location,
+            "event_time": item.event_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "description": item.description,
+            "status": item.status,
+            "publish_time": item.publish_time.strftime("%Y-%m-%d %H:%M:%S") if item.publish_time else None,
+            "images": images,                          # 文件名数组
+            "image_urls": [f"/uploads/{f}" for f in images]  # 可点击URL
+        })
+
+    return jsonify(result), 200
 
 
 @admin_bp.route('/notifications', methods=['GET'])

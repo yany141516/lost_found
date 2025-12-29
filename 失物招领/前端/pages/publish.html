@@ -333,7 +333,11 @@
 
             const fileInput = document.getElementById('image-upload');
             if (fileInput.files.length > 0) {
-                formData.append('image', fileInput.files[0]);
+                // 多图上传：最多3张
+                const maxCount = Math.min(fileInput.files.length, 3);
+                for (let i = 0; i < maxCount; i++) {
+                    formData.append('image', fileInput.files[i]);
+                }
             }
 
             try {
